@@ -1,10 +1,10 @@
 package com.vasscommerce.api.controller;
 
 import com.vasscommerce.api.dto.CategoriaDTO;
-import com.vasscommerce.api.dto.ProdutoDTO;
+import com.vasscommerce.api.dto.ProdutoResponse;
 import com.vasscommerce.api.entity.Categoria;
-import com.vasscommerce.api.entity.Produto;
 import com.vasscommerce.api.exception.ResourceNotFoundException;
+import com.vasscommerce.api.mapper.ProdutoMapper;
 import com.vasscommerce.api.repository.CategoriaRepository;
 import com.vasscommerce.api.repository.ProdutoRepository;
 import org.springframework.web.bind.annotation.*;
@@ -43,14 +43,14 @@ public class CategoriaController {
      * GET /categoria/{idcategoria}/produto -> Listagem de todos os produtos da categoria especificada
      */
     @GetMapping("/{idcategoria}/produto")
-    public List<ProdutoDTO> listarProdutosDaCategoria(@PathVariable Long idcategoria) {
+    public List<ProdutoResponse> listarProdutosDaCategoria(@PathVariable Long idcategoria) {
         // Garante que a categoria existe antes de listar os produtos
         if (!categoriaRepository.existsById(idcategoria)) {
             throw new ResourceNotFoundException("Categoria nao encontrada com id " + idcategoria);
         }
 
         return produtoRepository.findByCategoriaId(idcategoria).stream()
-                .map(ProdutoDTO::new)
+                .map(ProdutoMapper::toResponse)
                 .collect(Collectors.toList());
     }
 }

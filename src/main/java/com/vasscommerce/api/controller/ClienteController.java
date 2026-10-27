@@ -60,7 +60,8 @@ public class ClienteController {
      */
     @GetMapping("/{idcliente}/endereco")
     public EnderecoDTO buscarEnderecoDoCliente(@PathVariable Long idcliente) {
-        Cliente cliente = buscarClienteOuFalhar(idcliente);
+        Cliente cliente = clienteRepository.findWithEnderecoById(idcliente)
+                .orElseThrow(() -> new ResourceNotFoundException("Cliente nao encontrado com id " + idcliente));
 
         if (cliente.getEndereco() == null) {
             throw new ResourceNotFoundException("Cliente " + idcliente + " nao possui endereco cadastrado");

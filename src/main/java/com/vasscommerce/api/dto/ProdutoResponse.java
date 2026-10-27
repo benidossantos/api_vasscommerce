@@ -1,33 +1,25 @@
 package com.vasscommerce.api.dto;
 
-import com.vasscommerce.api.entity.Produto;
-
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-public class ProdutoDTO {
+/**
+ * Representacao de Produto devolvida pela API (GET /produto, GET /produto/{id},
+ * POST /produto e GET /categoria/{idcategoria}/produto).
+ */
+public class ProdutoResponse {
 
     private Long id;
     private String nome;
     private String descricao;
     private String fotoUrl;
     private BigDecimal valorUnitario;
-    private CategoriaDTO categoria;
+    private Long categoriaId;
+    private String categoriaNome;
     private LocalDateTime dataCadastro;
     private LocalDateTime dataUltimaAtualizacao;
 
-    public ProdutoDTO() {
-    }
-
-    public ProdutoDTO(Produto produto) {
-        this.id = produto.getId();
-        this.nome = produto.getNome();
-        this.descricao = produto.getDescricao();
-        this.fotoUrl = produto.getFotoUrl();
-        this.valorUnitario = produto.getValorUnitario();
-        this.categoria = new CategoriaDTO(produto.getCategoria());
-        this.dataCadastro = produto.getDataCadastro();
-        this.dataUltimaAtualizacao = produto.getDataUltimaAtualizacao();
+    public ProdutoResponse() {
     }
 
     public Long getId() {
@@ -70,12 +62,20 @@ public class ProdutoDTO {
         this.valorUnitario = valorUnitario;
     }
 
-    public CategoriaDTO getCategoria() {
-        return categoria;
+    public Long getCategoriaId() {
+        return categoriaId;
     }
 
-    public void setCategoria(CategoriaDTO categoria) {
-        this.categoria = categoria;
+    public void setCategoriaId(Long categoriaId) {
+        this.categoriaId = categoriaId;
+    }
+
+    public String getCategoriaNome() {
+        return categoriaNome;
+    }
+
+    public void setCategoriaNome(String categoriaNome) {
+        this.categoriaNome = categoriaNome;
     }
 
     public LocalDateTime getDataCadastro() {

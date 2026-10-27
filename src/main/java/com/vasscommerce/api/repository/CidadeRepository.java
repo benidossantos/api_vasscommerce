@@ -1,11 +1,13 @@
 package com.vasscommerce.api.repository;
 
 import com.vasscommerce.api.entity.Cidade;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
 
 public interface CidadeRepository extends JpaRepository<Cidade, Long> {
 
+    @EntityGraph(attributePaths = "estado")
     List<Cidade> findByEstadoId(Long estadoId);
 }

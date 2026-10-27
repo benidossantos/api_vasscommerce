@@ -1,0 +1,378 @@
+{
+  "info": {
+    "name": "VassCommerce - IoC/DI (ProdutoModel)",
+    "_postman_id": "0f1d9a52-3a6b-4d7e-9a41-5c2b7e6d8f10",
+    "description": "Demonstra a troca de implementacao de ProdutoModel (perfis mem e sql) e as respostas 201/200/404/400.\n\n1. Suba a API com o perfil desejado: mvn spring-boot:run -Dspring-boot.run.profiles=mem (ou sql).\n2. Ajuste a variavel de colecao 'perfil' para o mesmo valor (mem ou sql).\n3. Execute a colecao (Run collection) na ordem.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. GET /produto/1 (antes de criar) - mostra a troca de implementacao",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/produto/1",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "produto",
+            "1"
+          ]
+        },
+        "description": "Com perfil sql responde 200 (produto do DataSeeder); com perfil mem responde 404 (memoria vazia). Mesma rota, mesmo controller: so a implementacao injetada mudou."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const perfil = pm.variables.get(\"perfil\");",
+              "if (perfil === \"sql\") {",
+              "    pm.test(\"[sql] 200 - produto do DataSeeder existe no banco\", () => pm.response.to.have.status(200));",
+              "    pm.test(\"[sql] e o Smartphone XZ200 do banco H2\", () => pm.expect(pm.response.json().nome).to.eql(\"Smartphone XZ200\"));",
+              "} else {",
+              "    pm.test(\"[mem] 404 - a lista em memoria comeca vazia\", () => pm.response.to.have.status(404));",
+              "    pm.test(\"[mem] erro JSON padronizado\", () => pm.expect(pm.response.json().status).to.eql(404));",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. POST /produto (valido) -> 201 + Location",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/produto",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "produto"
+          ]
+        },
+        "description": "No perfil mem o id gerado e 1 (AtomicLong da memoria); no perfil sql e 4 (IDENTITY do banco, depois dos 3 produtos do DataSeeder).",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nome\": \"Mouse sem fio\",\n  \"descricao\": \"Mouse optico sem fio 1600 DPI\",\n  \"fotoUrl\": \"https://vasscommerce.com.br/img/produtos/mouse.png\",\n  \"valorUnitario\": 79.9,\n  \"categoriaId\": 1\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+              "pm.test(\"Header Location aponta para o novo produto\", () => {",
+              "    const body = pm.response.json();",
+              "    pm.expect(pm.response.headers.get(\"Location\")).to.match(new RegExp(\"/produto/\" + body.id + \"$\"));",
+              "});",
+              "pm.test(\"Corpo com os dados do produto\", () => {",
+              "    const body = pm.response.json();",
+              "    pm.expect(body.nome).to.eql(\"Mouse sem fio\");",
+              "    pm.expect(body.categoriaId).to.eql(1);",
+              "});",
+              "pm.collectionVariables.set(\"produtoId\", pm.response.json().id);",
+              "console.log(\"Perfil \" + pm.variables.get(\"perfil\") + \" gerou id \" + pm.response.json().id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. GET /produto/{id} (criado) -> 200",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/produto/{{produtoId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "produto",
+            "{{produtoId}}"
+          ]
+        },
+        "description": ""
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Retorna o produto criado\", () => {",
+              "    pm.expect(pm.response.json().id).to.eql(Number(pm.collectionVariables.get(\"produtoId\")));",
+              "    pm.expect(pm.response.json().nome).to.eql(\"Mouse sem fio\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. GET /produto/999999 -> 404",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/produto/999999",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "produto",
+            "999999"
+          ]
+        },
+        "description": ""
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"404 Not Found\", () => pm.response.to.have.status(404));",
+              "pm.test(\"Erro JSON padronizado\", () => {",
+              "    const body = pm.response.json();",
+              "    pm.expect(body).to.have.all.keys(\"timestamp\", \"status\", \"erro\", \"mensagem\", \"caminho\");",
+              "    pm.expect(body.mensagem).to.eql(\"Produto nao encontrado com id 999999\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. POST /produto (invalido) -> 400",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/produto",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "produto"
+          ]
+        },
+        "description": "",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nome\": \"\",\n  \"valorUnitario\": -10\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"400 Bad Request\", () => pm.response.to.have.status(400));",
+              "pm.test(\"Erro JSON padronizado com a lista de campos invalidos\", () => {",
+              "    const body = pm.response.json();",
+              "    pm.expect(body.status).to.eql(400);",
+              "    pm.expect(body.mensagem).to.eql(\"Dados invalidos na requisicao\");",
+              "    const campos = body.campos.map(c => c.campo);",
+              "    pm.expect(campos).to.include.members([\"nome\", \"descricao\", \"valorUnitario\", \"categoriaId\"]);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. POST /produto (JSON malformado) -> 400",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/produto",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "produto"
+          ]
+        },
+        "description": "",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"nome\": \"Mouse\", \"valorUnitario\": \"abc\""
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"400 Bad Request\", () => pm.response.to.have.status(400));",
+              "pm.test(\"Mensagem padronizada\", () => pm.expect(pm.response.json().mensagem).to.eql(\"Corpo da requisicao ausente ou JSON malformado\"));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. GET /produto?nome=mouse&valorMinimo=50&valorMaximo=100 -> 200",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/produto?nome=mouse&valorMinimo=50&valorMaximo=100",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "produto"
+          ],
+          "query": [
+            {
+              "key": "nome",
+              "value": "mouse"
+            },
+            {
+              "key": "valorMinimo",
+              "value": "50"
+            },
+            {
+              "key": "valorMaximo",
+              "value": "100"
+            }
+          ]
+        },
+        "description": ""
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Filtra pelo nome e pela faixa de valor\", () => {",
+              "    const lista = pm.response.json();",
+              "    pm.expect(lista.length).to.be.above(0);",
+              "    lista.forEach(p => {",
+              "        pm.expect(p.nome.toLowerCase()).to.include(\"mouse\");",
+              "        pm.expect(p.valorUnitario).to.be.within(50, 100);",
+              "    });",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. GET /produto (todos) -> 200",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/produto",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "produto"
+          ]
+        },
+        "description": ""
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+              "const perfil = pm.variables.get(\"perfil\");",
+              "pm.test(\"[\" + perfil + \"] quantidade de produtos depende da implementacao\", () => {",
+              "    const n = pm.response.json().length;",
+              "    if (perfil === \"sql\") pm.expect(n).to.be.at.least(4);   // 3 do DataSeeder + o criado",
+              "    else pm.expect(n).to.be.at.least(1);                     // apenas os criados em memoria",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "perfil",
+      "value": "mem"
+    },
+    {
+      "key": "produtoId",
+      "value": ""
+    }
+  ]
+}

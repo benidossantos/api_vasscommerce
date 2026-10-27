@@ -1,20 +1,27 @@
 # API do VassCommerce — Java + Spring Boot
 
-Implementação em **Java 17 + Spring Boot 3.2** das rotas de leitura (GET)
-descritas no enunciado do laboratório, a partir do diagrama de classes do
-VassCommerce.
+Implementação em **Java 17 + Spring Boot 3.2** da API do VassCommerce, a
+partir do diagrama de classes do laboratório.
+
+**Etapa atual — IoC/DI (Controllers x Models):** o `ProdutoController` depende
+apenas da interface `ProdutoModel`; as implementações concretas
+(`ProdutoModelMemoria` e `ProdutoModelSql`) são beans `@Service` escolhidos
+pelo Spring via `@Profile` e injetados pelo construtor. Veja a seção
+[IoC/DI — ProdutoModel](#iocdi--produtomodel) e o [`CHECKLIST.md`](CHECKLIST.md).
 
 ## Stack utilizada
 
 - Java 17
-- Spring Boot 3.2.5 (Web + Data JPA)
+- Spring Boot 3.2.5 (Web + Validation + Data JPA)
 - Banco de dados **H2** em memória (recriado e populado a cada execução)
 - Maven
 
 ## Como executar
 
 ```bash
-mvn spring-boot:run
+mvn spring-boot:run                                   # perfil padrao: mem
+mvn spring-boot:run -Dspring-boot.run.profiles=sql    # implementacao com banco
+mvn test                                              # testes automatizados
 ```
 
 A aplicação sobe em `http://localhost:8080` (o enunciado considera a porta
@@ -38,7 +45,9 @@ usuário `sa`, senha em branco.
 | GET | `/categoria` | Listagem de todas as categorias cadastradas |
 | GET | `/categoria?nome=<nomeCategoria>` | Busca de categoria por nome |
 | GET | `/categoria/{idcategoria}/produto` | Listagem de todos os produtos da categoria especificada |
-| GET | `/produto/{id}` | Visualizar dados do produto |
+| GET | `/produto?nome=&valorMinimo=&valorMaximo=` | Busca de produtos (filtros opcionais) — via `ProdutoModel` |
+| GET | `/produto/{id}` | Visualizar dados do produto (200 ou 404) — via `ProdutoModel` |
+| POST | `/produto` | Cadastro de produto (201 + `Location`, ou 400) — via `ProdutoModel` |
 | GET | `/cliente/{id}` | Visualizar dados do cliente |
 | GET | `/cliente/{idcliente}/formas-de-pagamento` | Listar todas as formas de pagamento (cartões) do cliente |
 | GET | `/cliente/{idcliente}/endereco` | Busca pelos dados do endereço do cliente |
@@ -47,9 +56,9 @@ usuário `sa`, senha em branco.
 | GET | `/estado/{idestado}/cidade` | Listagem de todas as cidades de um estado |
 | GET | `/cliente/{idcliente}/pedido` | Listagem de pedidos de um cliente |
 
-Todas as rotas respondem em `application/json`. Se um recurso não for
-encontrado, a API responde `404 Not Found` com um corpo JSON padronizado
-(veja `GlobalExceptionHandler`).
+Todas as rotas respondem em `application/json`. Erros (400, 404, 405, 415,
+500) são devolvidos sempre no mesmo formato JSON pelo `GlobalExceptionHandler`
+(`@RestControllerAdvice`).
 
 ## Exemplos de teste (com o cliente/produto/categoria/estado de id = 1)
 
@@ -58,6 +67,9 @@ curl http://localhost:8080/categoria
 curl "http://localhost:8080/categoria?nome=eletro"
 curl http://localhost:8080/categoria/1/produto
 curl http://localhost:8080/produto/1
+curl "http://localhost:8080/produto?nome=mouse&valorMinimo=50&valorMaximo=100"
+curl -i -X POST http://localhost:8080/produto -H "Content-Type: application/json" \
+     -d '{"nome":"Mouse sem fio","descricao":"Mouse optico","valorUnitario":79.90,"categoriaId":1}'
 curl http://localhost:8080/cliente/1
 curl http://localhost:8080/cliente/1/formas-de-pagamento
 curl http://localhost:8080/cliente/1/endereco
@@ -74,9 +86,11 @@ src/main/java/com/vasscommerce/api/
 ├── VasscommerceApiApplication.java   # classe principal
 ├── entity/                           # entidades JPA (mapeiam o diagrama de classes)
 ├── repository/                       # interfaces Spring Data JPA
-├── dto/                              # objetos de transferência retornados pela API
-├── controller/                       # controllers REST (uma rota por endpoint do enunciado)
-├── exception/                        # tratamento de erros (404, etc.)
+├── dto/                              # DTOs de request/response (ProdutoCreateRequest com @Valid)
+├── mapper/                           # ProdutoMapper: Request -> Entidade -> Response
+├── model/                            # ProdutoModel (interface) + ProdutoModelMemoria / ProdutoModelSql
+├── controller/                       # controllers REST (dependem de interfaces, injeção por construtor)
+├── exception/                        # @RestControllerAdvice + JSON de erro padronizado
 └── config/
     └── DataSeeder.java               # popula o banco H2 com dados de exemplo
 ```
@@ -99,3 +113,78 @@ src/main/java/com/vasscommerce/api/
 - `/cliente/{idcliente}/formas-de-pagamento` retorna os cartões (`Cartao`)
   cadastrados pelo cliente, que representam as formas de pagamento do
   diagrama.
+
+## IoC/DI — ProdutoModel
+
+```
+ProdutoController ──depende de──> ProdutoModel (interface)
+                                       ▲               ▲
+                     @Profile("mem")   │               │   @Profile("sql")
+                 ProdutoModelMemoria ──┘               └── ProdutoModelSql
+                 (lista em memória)                       (Spring Data JPA / H2)
+```
+
+- **Contrato:** `ProdutoModel` (`criar`, `obterPorId`, `buscar`). A camada model
+  trabalha com a entidade `Produto`; o controller converte
+  `ProdutoCreateRequest -> Produto -> ProdutoResponse` com o `ProdutoMapper`.
+- **Implementações:**
+  - `ProdutoModelMemoria` — `@Service("produtoModelMemoria")`: lista em memória
+    com ids gerados por `AtomicLong`. Começa vazia e perde os dados ao reiniciar.
+  - `ProdutoModelSql` — `@Service("produtoModelSql")`: usa `ProdutoRepository`
+    (JPA) sobre o H2, enxerga os produtos criados pelo `DataSeeder` e valida
+    que a categoria informada existe (senão responde 404). Trocando apenas o
+    datasource, o mesmo código serve para Postgres/MySQL.
+- **Seleção (estratégia adotada: `@Profile`):** `spring.profiles.active=mem` em
+  `application.properties`. Para usar a outra implementação, altere para `sql`
+  ou rode `mvn spring-boot:run -Dspring-boot.run.profiles=sql` (ou
+  `java -jar target/vasscommerce-api-1.0.0.jar --spring.profiles.active=sql`).
+  Na inicialização o log informa qual implementação foi injetada:
+  `ProdutoController usando a implementacao ProdutoModelMemoria`.
+- **Injeção por construtor:** nenhum `@Autowired` em campo no projeto.
+
+### Alternativas (`@Primary` / `@Qualifier`)
+
+Os beans já têm nomes (`produtoModelMemoria` e `produtoModelSql`), então as
+outras estratégias do enunciado exigem só trocar anotações:
+
+- `@Primary`: remova os `@Profile` e anote `ProdutoModelMemoria` com `@Primary`.
+- `@Qualifier`: remova os `@Profile` e use no construtor do controller
+  `public ProdutoController(@Qualifier("produtoModelSql") ProdutoModel model)`.
+
+### Comparando as implementações
+
+| Requisição | perfil `mem` | perfil `sql` |
+|---|---|---|
+| `GET /produto/1` logo após subir | 404 (memória vazia) | 200 (Smartphone do DataSeeder) |
+| primeiro `POST /produto` | id 1 | id 4 (depois dos 3 produtos do DataSeeder) |
+| `POST /produto` com `categoriaId` inexistente | 201 (memória não conhece categorias) | 404 `Categoria nao encontrada` |
+| `GET /categoria/{id}/produto` | lê sempre do banco (não usa `ProdutoModel`) | lê do banco |
+
+## Postman
+
+A coleção `postman/VassCommerce-IoC-DI.postman_collection.json` tem as
+requisições com testes automáticos (201 + Location, 200, 404 e 400). Para
+demonstrar a troca de implementação:
+
+1. Suba a API com o perfil `mem`, importe a coleção no Postman, deixe a variável
+   de coleção `perfil = mem` e execute **Run collection**.
+2. Pare a API, suba com o perfil `sql`, mude `perfil = sql` e execute de novo.
+
+Pela linha de comando, com o [newman](https://www.npmjs.com/package/newman):
+
+```bash
+npx newman run postman/VassCommerce-IoC-DI.postman_collection.json --env-var perfil=mem
+```
+
+As saídas das duas execuções (17/17 asserções passando em cada perfil) estão em
+`docs/evidencias/execucao-perfil-mem.md` e `docs/evidencias/execucao-perfil-sql.md`.
+
+## Correções feitas nesta etapa
+
+Com `spring.jpa.open-in-view=false`, as rotas `/produto/{id}`,
+`/categoria/{id}/produto`, `/cliente/{id}/endereco`, `/cliente/{id}/pedido` e
+`/estado/{id}/cidade` respondiam **500** (`LazyInitializationException`), porque
+os DTOs acessavam relacionamentos `LAZY` depois de fechada a sessão do JPA. Os
+repositórios agora carregam esses relacionamentos com `@EntityGraph` /
+`join fetch`. Além disso, uma rota inexistente respondia 500 e agora responde
+404 no formato de erro padronizado. O `ApiIntegracaoTest` cobre essas rotas.

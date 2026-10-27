@@ -99,7 +99,16 @@ public class Produto {
         return dataCadastro;
     }
 
+    // Usado pela implementacao em memoria (sem JPA, o @PrePersist nao e chamado)
+    public void setDataCadastro(LocalDateTime dataCadastro) {
+        this.dataCadastro = dataCadastro;
+    }
+
     public LocalDateTime getDataUltimaAtualizacao() {
         return dataUltimaAtualizacao;
+    }
+
+    public void setDataUltimaAtualizacao(LocalDateTime dataUltimaAtualizacao) {
+        this.dataUltimaAtualizacao = dataUltimaAtualizacao;
     }
 }
